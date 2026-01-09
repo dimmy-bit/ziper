@@ -1,0 +1,7 @@
+{
+  "name": "ZIPER",
+  "description": "A premium, dark-mode image transformation platform that uses AI to apply creative styles like Gummy, 3D, and Cartoon to your photos.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
