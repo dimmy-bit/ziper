@@ -18,7 +18,7 @@ const AppInterface: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        setError("File size exceeds 5MB limit.");
+        setError("File size exceeds the 5MB professional limit.");
         return;
       }
       
@@ -47,8 +47,9 @@ const AppInterface: React.FC = () => {
         status: 'success',
         timestamp: Date.now()
       });
-    } catch (err) {
-      setError("Something went wrong during generation. Please try again.");
+    } catch (err: any) {
+      // Show the actual error message for better diagnostics on Vercel
+      setError(err.message || "An unexpected error occurred during generation. Please try again.");
       gemini.logGeneration({
         style: selectedStyle?.id,
         status: 'error',
@@ -184,7 +185,10 @@ const AppInterface: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              {error}
+              <div className="flex-1 overflow-hidden text-ellipsis">
+                <p className="font-bold mb-1 uppercase tracking-tight">System Message</p>
+                {error}
+              </div>
             </div>
           )}
         </div>
@@ -255,8 +259,8 @@ const AppInterface: React.FC = () => {
             <div className="space-y-2">
               <p className="text-base font-black text-[#A3E635] tracking-tight">Pro Creator Styling</p>
               <p className="text-xs text-[#A3E635]/70 leading-relaxed font-medium">
-                ZIPER is built for creators who demand high-fidelity artistic renders without the wait. 
-                All generations are processed in real-time with zero watermarks.
+                ZIPER is built for creators who demand high-fidelity artistic renders. 
+                All generations are processed in real-time with zero watermarks using MIR tech.
               </p>
             </div>
           </div>

@@ -15,41 +15,48 @@ export class GeminiService {
 
   /**
    * Transforms an image based on a style prompt using the Gemini 2.5 Flash Image model.
-   * Re-instantiates the client per-call to ensure we use the latest environment API key.
+   * Re-instantiates the client per-call for robust environment variable handling.
    */
   public async transformImage(base64Image: string, prompt: string): Promise<string> {
-    // Re-instantiate the AI client right before use to ensure the latest API_KEY is used
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+    const apiKey = process.env.API_KEY;
+    
+    if (!apiKey) {
+      throw new Error("API configuration is missing. Please ensure the API Key is set in your environment variables.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const model = 'gemini-2.5-flash-image';
     
     // Clean base64 string and extract MIME type
-    const data = base64Image.split(',')[1] || base64Image;
-    const mimeType = base64Image.match(/data:([^;]+);/)?.[1] || 'image/png';
+    const dataMatch = base64Image.match(/^data:([^;]+);base64,(.+)$/);
+    const mimeType = dataMatch ? dataMatch[1] : 'image/png';
+    const data = dataMatch ? dataMatch[2] : base64Image.split(',')[1] || base64Image;
 
     try {
       const response = await ai.models.generateContent({
         model,
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                data,
-                mimeType,
+        contents: [
+          {
+            parts: [
+              {
+                inlineData: {
+                  data,
+                  mimeType,
+                },
               },
-            },
-            {
-              text: `${prompt}. Preserve the original subject's facial features and essential structure. Ensure the output is high-fidelity, professional, and visually stunning.`,
-            },
-          ],
-        },
+              {
+                text: `${prompt}. Preserve the original subject's facial features and essential structure. Ensure the output is high-fidelity and artistic.`,
+              },
+            ],
+          }
+        ],
       });
 
       if (!response.candidates?.[0]?.content?.parts) {
-        throw new Error("Invalid response from MIR AI engine.");
+        throw new Error("The AI engine returned an empty response. This may be due to a safety filter or temporary service outage.");
       }
 
       let imageUrl = '';
-      // Iterate through all parts to find the image part, as text might also be returned
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
           imageUrl = `data:image/png;base64,${part.inlineData.data}`;
@@ -58,30 +65,32 @@ export class GeminiService {
       }
 
       if (!imageUrl) {
-        // Check if the model returned text instead (often a safety refusal)
         const textPart = response.candidates[0].content.parts.find(p => p.text);
         if (textPart) {
-          throw new Error(`AI Note: ${textPart.text}`);
+          throw new Error(`AI Engine Note: ${textPart.text}`);
         }
-        throw new Error("The transformation was filtered. Please try a different photo or style.");
+        throw new Error("No image was generated. Please try a different style or photo.");
       }
 
       return imageUrl;
     } catch (error: any) {
       console.error("Gemini transformation error:", error);
-      // Surface helpful error messages to the UI
-      if (error.message?.includes("API_KEY")) {
-        throw new Error("System is authenticating. Please try again in a moment.");
+      
+      // Handle common API errors with user-friendly messages
+      const msg = error.message || "";
+      if (msg.includes("403") || msg.includes("API_KEY_INVALID")) {
+        throw new Error("The provided API Key is invalid or has expired.");
+      } else if (msg.includes("429")) {
+        throw new Error("Too many requests. Please wait a moment before trying again.");
+      } else if (msg.includes("404")) {
+        throw new Error("The MIR AI model is currently undergoing maintenance. Please try again later.");
       }
+      
       throw error;
     }
   }
 
-  /**
-   * Logs generation metadata for analytics and stability tracking.
-   */
   public async logGeneration(data: { style: string; status: string; timestamp?: number; error_type?: string }) {
-    // Analytics logging for ZIPER quality control
     console.log("Analytics Log:", {
       ...data,
       timestamp: data.timestamp || Date.now(),
