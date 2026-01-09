@@ -1,14 +1,11 @@
 
 /**
- * ZIPER AI Service - Powered by Hugging Face Inference API
- * Optimized for professional, high-fidelity style transformation.
+ * ZIPER AI Service - Powered by Pollinations AI
+ * Fast, browser-safe, and zero-config image generation.
  */
 
 export class GeminiService {
   private static instance: GeminiService;
-  // Using SDXL for high-quality professional output on the free tier
-  private readonly MODEL_ID = "stabilityai/stable-diffusion-xl-base-1.0";
-  private readonly HF_API_URL = `https://api-inference.huggingface.co/models/${this.MODEL_ID}`;
 
   private constructor() {}
 
@@ -20,70 +17,36 @@ export class GeminiService {
   }
 
   /**
-   * Generates a stylized image using Hugging Face Inference API.
-   * This implementation converts the resulting Blob into a Base64 string
-   * to maintain compatibility with the existing ZIPER frontend.
+   * Generates a stylized image using Pollinations AI.
+   * Constructed as a GET request to avoid CORS and API key dependencies.
    */
   public async transformImage(_base64Image: string, prompt: string): Promise<string> {
-    const token = process.env.API_KEY;
-
-    if (!token) {
-      throw new Error("Hugging Face Token is missing. Please set your HF Token in environment variables.");
-    }
-
     try {
-      // For Free Tier Inference API, we optimize the prompt to ensure high-end results
-      // Note: Most standard free-tier HF endpoints are Text-to-Image optimized.
-      const enhancedPrompt = `${prompt}, high resolution, 8k, professional lighting, masterwork, masterpiece, trending on artstation`;
-
-      const response = await fetch(this.HF_API_URL, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-        body: JSON.stringify({
-          inputs: enhancedPrompt,
-          parameters: {
-            negative_prompt: "blurry, distorted, low quality, low resolution, grain, watermark, signature",
-            guidance_scale: 7.5,
-            num_inference_steps: 30,
-          },
-        }),
-      });
-
-      // Handle common API issues
-      if (response.status === 429) {
-        throw new Error("ZIPER is experiencing high demand (Rate Limit). Please wait 30 seconds and try again.");
-      }
-
-      if (response.status === 503) {
-        throw new Error("The AI model is currently loading on Hugging Face. Please try again in 1 minute.");
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `AI Engine Error: ${response.statusText}`);
-      }
-
-      // Process the image response
-      const blob = await response.blob();
+      // 1. Generate a random seed for uniqueness
+      const seed = Math.floor(Math.random() * 1000000);
       
-      // Validate that we actually got an image
-      if (!blob.type.startsWith('image/')) {
-        throw new Error("The AI engine returned an invalid format. Please try again.");
-      }
+      // 2. Enhance the prompt for Pollinations/Flux models
+      const enhancedPrompt = encodeURIComponent(
+        `${prompt}, highly detailed, 8k, professional photography, cinematic lighting, masterpiece`
+      );
 
-      // Convert Blob to Base64 to integrate with ZIPER's existing download/display logic
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Failed to process the generated masterpiece."));
-        reader.readAsDataURL(blob);
+      // 3. Construct the Pollinations URL (512x512 as requested)
+      const imageUrl = `https://pollinations.ai/p/${enhancedPrompt}?width=512&height=512&seed=${seed}&model=flux&nologo=true`;
+
+      // 4. Professional Preloader: We "await" the actual image loading 
+      // so the UI spinner doesn't disappear before the pixels arrive.
+      await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(imageUrl);
+        img.onerror = () => reject(new Error("The AI generation timed out. Please try again."));
+        // Set a timeout for safety
+        setTimeout(() => reject(new Error("Connection unstable. Please check your network.")), 15000);
+        img.src = imageUrl;
       });
 
+      return imageUrl;
     } catch (error: any) {
-      console.error("Hugging Face Inference Error:", error);
+      console.error("Pollinations Generation Error:", error);
       throw error;
     }
   }
@@ -95,7 +58,7 @@ export class GeminiService {
     console.log("ZIPER Analytics:", {
       ...data,
       timestamp: data.timestamp || Date.now(),
-      engine: "HuggingFace_SDXL"
+      engine: "Pollinations_Flux_512"
     });
   }
 }
