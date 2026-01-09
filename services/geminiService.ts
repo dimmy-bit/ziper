@@ -1,7 +1,7 @@
 
 /**
  * ZIPER AI Service - Powered by Pollinations AI
- * Fast, browser-safe, and zero-config image generation.
+ * 100% Browser-safe. Zero CORS issues. No API keys required.
  */
 
 export class GeminiService {
@@ -17,48 +17,59 @@ export class GeminiService {
   }
 
   /**
-   * Generates a stylized image using Pollinations AI.
-   * Constructed as a GET request to avoid CORS and API key dependencies.
+   * Generates a high-quality stylized image.
+   * Uses Pollinations AI via simple GET request to ensure no CORS or API limits.
    */
   public async transformImage(_base64Image: string, prompt: string): Promise<string> {
     try {
-      // 1. Generate a random seed for uniqueness
-      const seed = Math.floor(Math.random() * 1000000);
+      // 1. Create a unique seed so every click gives a fresh result
+      const seed = Math.floor(Math.random() * 9999999);
       
-      // 2. Enhance the prompt for Pollinations/Flux models
-      const enhancedPrompt = encodeURIComponent(
-        `${prompt}, highly detailed, 8k, professional photography, cinematic lighting, masterpiece`
-      );
+      // 2. Clean and encode the prompt
+      const finalPrompt = encodeURIComponent(prompt);
 
-      // 3. Construct the Pollinations URL (512x512 as requested)
-      const imageUrl = `https://pollinations.ai/p/${enhancedPrompt}?width=512&height=512&seed=${seed}&model=flux&nologo=true`;
+      // 3. Construct the Pollinations URL 
+      // We use width/height 512 for speed and the 'flux' model for premium quality.
+      const imageUrl = `https://pollinations.ai/p/${finalPrompt}?width=512&height=512&seed=${seed}&model=flux&nologo=true`;
 
-      // 4. Professional Preloader: We "await" the actual image loading 
-      // so the UI spinner doesn't disappear before the pixels arrive.
-      await new Promise((resolve, reject) => {
+      // 4. PRELOADER: This is the "magic" part. 
+      // It waits for the image to actually finish generating before showing it.
+      return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve(imageUrl);
-        img.onerror = () => reject(new Error("The AI generation timed out. Please try again."));
-        // Set a timeout for safety
-        setTimeout(() => reject(new Error("Connection unstable. Please check your network.")), 15000);
+        
+        // Give the AI 20 seconds to finish the render
+        const timeout = setTimeout(() => {
+          reject(new Error("Generation timed out. Please try again."));
+        }, 20000);
+
+        img.onload = () => {
+          clearTimeout(timeout);
+          resolve(imageUrl);
+        };
+
+        img.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error("AI Engine is temporarily busy. Please try again in 5 seconds."));
+        };
+
+        // Start the browser's native download of the AI result
         img.src = imageUrl;
       });
 
-      return imageUrl;
     } catch (error: any) {
-      console.error("Pollinations Generation Error:", error);
+      console.error("ZIPER Generation Error:", error);
       throw error;
     }
   }
 
   /**
-   * Logs generation metadata for analytics.
+   * Analytics logging (Purely for console visibility)
    */
   public async logGeneration(data: { style: string; status: string; timestamp?: number; error_type?: string }) {
-    console.log("ZIPER Analytics:", {
+    console.log("ZIPER SYSTEM LOG:", {
       ...data,
-      timestamp: data.timestamp || Date.now(),
-      engine: "Pollinations_Flux_512"
+      engine: "Pollinations_Flux_V3",
+      timestamp: data.timestamp || Date.now()
     });
   }
 }
